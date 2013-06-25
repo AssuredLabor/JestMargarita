@@ -77,7 +77,7 @@ public class JestResult {
     public <T> T getSourceAsObject(Class<?> clazz) {
         List sourceList = ((List) extractSource());
         if (sourceList.size() > 0)
-            return createSourceObject(sourceList.get(0), clazz);
+            return (T) createSourceObject(sourceList.get(0), clazz);
         else
             return null;
     }
