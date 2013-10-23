@@ -1,24 +1,51 @@
 package io.searchbox.core;
 
+import com.google.gson.Gson;
 import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class Validate extends AbstractAction {
 
+    private Object query;
 
-public class Validate extends AbstractAction implements Action {
+    private Validate(Builder builder) {
+        super(builder);
 
-    final static Logger log = LoggerFactory.getLogger(Validate.class);
+        this.indexName = builder.index;
+        this.typeName = builder.type;
+        this.query = builder.query;
+        setURI(buildURI());
+    }
 
-    public static class Builder {
+    @Override
+    protected String buildURI() {
+        StringBuilder sb = new StringBuilder(super.buildURI());
+        sb.append("/_validate/query");
+        return sb.toString();
+    }
+
+    @Override
+    public String getRestMethodName() {
+        return "POST";
+    }
+
+    @Override
+    public Object getData(Gson gson) {
+        return query;
+    }
+
+    @Override
+    public String getPathToResult() {
+        return "valid";
+    }
+
+    public static class Builder extends AbstractAction.Builder<Validate, Builder> {
+        private final Object query;
         private String index;
         private String type;
-        private final Object query;
 
         public Builder(Object query) {
             this.query = query;
@@ -37,35 +64,5 @@ public class Validate extends AbstractAction implements Action {
         public Validate build() {
             return new Validate(this);
         }
-    }
-
-    private Validate(Builder builder) {
-        super.indexName = builder.index;
-        super.typeName = builder.type;
-        setURI(buildURI(builder.index, builder.type, null));
-        setData(builder.query);
-    }
-
-    protected String buildURI(String index, String type, String id) {
-        StringBuilder sb = new StringBuilder();
-        if (StringUtils.isNotBlank(index)) sb.append(index);
-
-        if (StringUtils.isNotBlank(type)) sb.append("/").append(type);
-
-        if (StringUtils.isNotBlank(id)) sb.append("/").append(id);
-        sb.append("/").append("_validate/query");
-
-        log.debug("Created URI for validate action is :" + sb.toString());
-        return sb.toString();
-    }
-
-    @Override
-    public String getRestMethodName() {
-        return "POST";
-    }
-
-    @Override
-    public String getPathToResult() {
-        return "valid";
     }
 }

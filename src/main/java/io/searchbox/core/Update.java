@@ -1,66 +1,34 @@
 package io.searchbox.core;
 
-import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Map;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import io.searchbox.AbstractDocumentTargetedAction;
+import io.searchbox.BulkableAction;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class Update extends AbstractDocumentTargetedAction implements BulkableAction {
 
-
-public class Update extends AbstractAction implements Action {
-
-    final static Logger log = LoggerFactory.getLogger(Update.class);
-
-    private Object script;
-
-    public static class Builder {
-        private String index;
-        private String type;
-        private String id = null;
-        private final Object script;
-
-        public Builder(Object script) {
-            this.script = script;
-        }
-
-        public Builder id(String val) {
-            id = val;
-            return this;
-        }
-
-        public Builder index(String val) {
-            index = val;
-            return this;
-        }
-
-        public Builder type(String val) {
-            type = val;
-            return this;
-        }
-
-        public Update build() {
-            return new Update(this);
-        }
-    }
+    private Object payload;
 
     private Update(Builder builder) {
-        indexName = builder.index;
-        typeName = builder.type;
-        id = builder.id;
-        setData(builder.script);
+        super(builder);
+
+        this.payload = builder.payload;
+        setURI(buildURI());
     }
 
     @Override
-    public String getURI() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(super.buildURI(indexName, typeName, id))
-                .append("/_update");
-        log.debug("Created URI for update action is :" + sb.toString());
+    public String getBulkMethodName() {
+        return "update";
+    }
+
+    @Override
+    protected String buildURI() {
+        StringBuilder sb = new StringBuilder(super.buildURI());
+        sb.append("/_update");
         return sb.toString();
     }
 
@@ -70,13 +38,30 @@ public class Update extends AbstractAction implements Action {
     }
 
     @Override
+    public Object getData(Gson gson) {
+        return payload;
+    }
+
+    @Override
     public String getPathToResult() {
         return "ok";
     }
 
     @Override
-    public Boolean isOperationSucceed(Map result) {
-        return (Boolean) result.get("ok");
+    public Boolean isOperationSucceed(JsonObject result) {
+        return result.get("ok").getAsBoolean();
+    }
+
+    public static class Builder extends AbstractDocumentTargetedAction.Builder<Update, Builder> {
+        private final Object payload;
+
+        public Builder(Object payload) {
+            this.payload = payload;
+        }
+
+        public Update build() {
+            return new Update(this);
+        }
     }
 
 }

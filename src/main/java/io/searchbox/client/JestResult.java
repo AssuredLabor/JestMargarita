@@ -1,38 +1,41 @@
 package io.searchbox.client;
 
-import io.searchbox.annotations.JestId;
+import com.google.gson.*;
 
-import java.io.InvalidObjectException;
-import java.lang.reflect.Field;
-import java.util.*;
+import io.searchbox.annotations.JestId;
+import io.searchbox.core.search.facet.Facet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InvalidObjectException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import com.google.gson.Gson;
+import java.util.Map.Entry;
 
 /**
  * @author Dogukan Sonmez
  */
 
-
 public class JestResult {
 
-    final static Logger log = LoggerFactory.getLogger(JestResult.class);
     public static final String ES_METADATA_ID = "es_metadata_id";
-
-    private Map jsonMap;
-
+    final static Logger log = LoggerFactory.getLogger(JestResult.class);
+    private JsonObject jsonObject;
     private String jsonString;
-
     private String pathToResult;
-
     private boolean isSucceeded;
+    private String errorMessage;
+    private Gson gson;
+
+    public JestResult(Gson gson) {
+        this.gson = gson;
+    }
 
     public String getPathToResult() {
         return pathToResult;
@@ -43,7 +46,7 @@ public class JestResult {
     }
 
     public Object getValue(String key) {
-        return jsonMap.get(key);
+        return getJsonMap().get(key);
     }
 
     public boolean isSucceeded() {
@@ -63,37 +66,54 @@ public class JestResult {
     }
 
     public String getErrorMessage() {
-        return (String) jsonMap.get("error");
+        return errorMessage;
     }
 
+    /**
+     * manually set an error message, eg. for the cases where non-200 response code is received
+     */
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public JsonObject getJsonObject() {
+        return jsonObject;
+    }
+
+    public void setJsonObject(JsonObject jsonObject) {
+        this.jsonObject = jsonObject;
+        if (jsonObject.get("error") != null) {
+            errorMessage = jsonObject.get("error").getAsString();
+        }
+    }
+
+    @Deprecated
+    @SuppressWarnings("rawtypes")
     public Map getJsonMap() {
-        return jsonMap;
+        return gson.fromJson(jsonObject, Map.class);
     }
 
-    public void setJsonMap(Map jsonMap) {
-        this.jsonMap = jsonMap;
+    public void setJsonMap(Map<String, Object> resultMap) {
+        String json = gson.toJson(resultMap, Map.class);
+        setJsonObject(new JsonParser().parse(json).getAsJsonObject());
     }
 
-    public <T> T getSourceAsObject(Class<?> clazz) {
-        List sourceList = ((List) extractSource());
+    public <T> T getSourceAsObject(Class<T> clazz) {
+        JsonArray sourceList = extractSource();
         if (sourceList.size() > 0)
-            return (T) createSourceObject(sourceList.get(0), clazz);
+            return createSourceObject(sourceList.get(0), clazz);
         else
             return null;
     }
 
-    private <T> T createSourceObject(Object source, Class<?> type) {
-        Object obj = null;
+    private <T> T createSourceObject(JsonElement source, Class<T> type) {
+        T obj = null;
         try {
-            if (source instanceof Map) {
-                Gson gson = new Gson();
-                String json = gson.toJson(source, Map.class);
-                obj = gson.fromJson(json, type);
-            } else {
-                obj = type.cast(source);
-            }
 
-            //Check if JestId is visible
+            String json = source.toString();
+            obj = gson.fromJson(json, type);
+
+            // Check if JestId is visible
             Field[] fields = type.getDeclaredFields();
             for (Field field : fields) {
                 if (field.isAnnotationPresent(JestId.class)) {
@@ -101,7 +121,9 @@ public class JestResult {
                         field.setAccessible(true);
                         Object value = field.get(obj);
                         if (value == null) {
-                            field.set(obj, ((Map) source).get(ES_METADATA_ID));
+                            Class<?> fieldType = field.getType();
+                            JsonElement id = ((JsonObject) source).get(ES_METADATA_ID);
+                            field.set(obj, getAs(id, fieldType));
                         }
                     } catch (IllegalAccessException e) {
                         log.error("Unhandled exception occurred while getting annotated id from source");
@@ -116,99 +138,132 @@ public class JestResult {
         return (T) obj;
     }
 
-    public <T> T getSourceAsObjectList(Class<?> type) {
-        List<Object> objectList = new ArrayList<Object>();
-        if (!isSucceeded) return (T) objectList;
-        List<Object> sourceList = (List<Object>) extractSource();
-        for (Object source : sourceList) {
-            Object obj = createSourceObject(source, type);
-            if (obj != null) objectList.add(obj);
+    @SuppressWarnings("unchecked")
+    private <T> T getAs(JsonElement id, Class<T> fieldType) throws IllegalAccessException {
+        if (id.isJsonNull()) {
+            return null;
         }
-        return (T) objectList;
+        if (fieldType.isAssignableFrom(String.class)) {
+            return (T) id.getAsString();
+        }
+        if (fieldType.isAssignableFrom(Number.class)) {
+            return (T) id.getAsNumber();
+        }
+        if (fieldType.isAssignableFrom(BigDecimal.class)) {
+            return (T) id.getAsBigDecimal();
+        }
+        if (fieldType.isAssignableFrom(Double.class)) {
+            Object o = id.getAsDouble();
+            return (T) o;
+        }
+        if (fieldType.isAssignableFrom(Float.class)) {
+            Object o = id.getAsFloat();
+            return (T) o;
+        }
+        if (fieldType.isAssignableFrom(BigInteger.class)) {
+            return (T) id.getAsBigInteger();
+        }
+        if (fieldType.isAssignableFrom(Long.class)) {
+            Object o = id.getAsLong();
+            return (T) o;
+        }
+        if (fieldType.isAssignableFrom(Integer.class)) {
+            Object o = id.getAsInt();
+            return (T) o;
+        }
+        if (fieldType.isAssignableFrom(Short.class)) {
+            Object o = id.getAsShort();
+            return (T) o;
+        }
+        if (fieldType.isAssignableFrom(Character.class)) {
+            return (T) (Character) id.getAsCharacter();
+        }
+        if (fieldType.isAssignableFrom(Byte.class)) {
+            return (T) (Byte) id.getAsByte();
+        }
+        if (fieldType.isAssignableFrom(Boolean.class)) {
+            return (T) (Boolean) id.getAsBoolean();
+        }
+
+        throw new RuntimeException("cannot assign " + id + " to " + fieldType);
     }
 
-    public Object extractSource() {
+    public <T> List<T> getSourceAsObjectList(Class<T> type) {
+        List<T> objectList = new ArrayList<T>();
+        if (!isSucceeded)
+            return objectList;
+        JsonArray sourceList = extractSource();
+        for (JsonElement source : sourceList) {
+            T obj = createSourceObject(source, type);
+            if (obj != null)
+                objectList.add(obj);
+        }
+        return objectList;
+    }
+
+    public JsonArray extractSource() {
         return extractSourceFromPath(getKeys());
     }
+    
+    public JsonArray extractSourceFromPath(String[] keys) {
+        JsonArray sourceList = new JsonArray();
+        if (jsonObject == null)
+            return sourceList;
+        if (keys == null) {
+            sourceList.add(jsonObject);
+            return sourceList;
+        }
+        String sourceKey = keys[keys.length - 1];
+        JsonElement obj = jsonObject.get(keys[0]);
+        if (keys.length > 1) {
+            for (int i = 1; i < keys.length - 1; i++) {
+                obj = ((JsonObject) obj).get(keys[i]);
+            }
 
-    /**
-     * Drill down through the jsonMapObject via the path given ( delimited by / ).
-     * 
-     * 
-     * Note: the last token from the delimited path will be used to traverse the final object or objects found
-     *      i.e. hits/hits/_source will drill down the path until second to last node ( hits/hits ) 
-     *          and analyze the next drill down object
-     *          if the next drildown object is a Map, it will try to access the map's value for "_source"
-     *          if the next drilldown object is a List, it will try to traverse every object within that list
-     *              for the value of "_source" ( if the object is not a map, then we do not add it to our results)
-     *              
-     *      Logic refactored from extractSource()
-     *      
-     * @param path
-     * @return a list of the objects that we have found
-     */
-    public List<Object> extractSourceFromPath(String[] keys){
-        List<Object> sourceList = new ArrayList<Object>();
-        if(jsonMap == null){
-            return sourceList;
-        }
-        if(keys == null){
-            sourceList.add(jsonMap);
-            return sourceList;
-        }
-        
-        Object node = jsonMap;
-        try{
-            // drill down to 2nd to last node in path
-            for(int keyIndex = 0; keyIndex <= keys.length - 2; keyIndex++){
-                node = ((Map<String,Object>)node).get(keys[keyIndex]);
-                if(node == null){
-                    throw new InvalidObjectException(keys[keyIndex] + " not found");
-                }
-            }
-            
-            String lastKey = keys[keys.length - 1];
-            
-            if(node instanceof Map){
-                Object endChild = ((Map<String,Object>) node).get(lastKey);
-                if(endChild != null){
-                    sourceList.add(endChild);
-                } else {
-                    throw new InvalidObjectException(lastKey + " not found");
-                }
-            }
-            
-            if(node instanceof List){
-                for (Object endChild : (List) node) {
-                    if (endChild instanceof Map) {
-                        Map<String, Object> source = (Map<String, Object>) ((Map<String,Object>) endChild).get(lastKey);
+            if (obj.isJsonObject()) {
+                JsonElement source = ((JsonObject) obj).get(sourceKey);
+                if (source != null)
+                    sourceList.add(source);
+            } else if (obj.isJsonArray()) {
+                for (JsonElement newObj : (JsonArray) obj) {
+                    if (newObj instanceof JsonObject) {
+                        JsonObject source = (JsonObject) ((JsonObject) newObj).get(sourceKey);
                         if (source != null) {
-                            source.put(ES_METADATA_ID, ((Map) endChild).get("_id"));
+                            source.add(ES_METADATA_ID, ((JsonObject) newObj).get("_id"));
                             sourceList.add(source);
                         }
                     }
                 }
             }
-        } catch(InvalidObjectException e){
-            log.warn("The path <" + keys + "> could not be resolved from the jsonObject", e);
+        } else {
+            if (obj != null) {
+                sourceList.add(obj);
+            }
         }
         return sourceList;
     }
+
     protected String[] getKeys() {
         return pathToResult == null ? null : (pathToResult + "").split("/");
     }
 
-    public <T> List<T> getFacets(Class<?> type) {
+    public <T extends Facet> List<T> getFacets(Class<T> type) {
         List<T> facets = new ArrayList<T>();
-        if (jsonMap != null) {
-            Constructor c;
+        if (jsonObject != null) {
+            Constructor<T> c;
             try {
-                Map<String, Map> facetsMap = (Map<String, Map>) jsonMap.get("facets");
-                for (Object facetKey : facetsMap.keySet()) {
-                    Map facet = facetsMap.get(facetKey);
-                    if (facet.get("_type").toString().equalsIgnoreCase(type.getField("TYPE").get(null).toString())) {
-                        c = Class.forName(type.getName()).getConstructor(String.class, Map.class);
-                        facets.add((T) c.newInstance(facetKey.toString(), facetsMap.get(facetKey)));
+                JsonObject facetsMap = (JsonObject) jsonObject.get("facets");
+                if (facetsMap == null)
+                    return facets;
+                for (Entry<String, JsonElement> facetEntry : facetsMap.entrySet()) {
+                    JsonObject facet = facetEntry.getValue().getAsJsonObject();
+                    if (facet.get("_type").getAsString().equalsIgnoreCase(type.getField("TYPE").get(null).toString())) {
+                        // c = (Constructor<T>)
+                        // Class.forName(type.getName()).getConstructor(String.class,JsonObject.class);
+
+                        c = type.getConstructor(String.class, JsonObject.class);
+                        facets.add((T) c.newInstance(facetEntry.getKey(), facetEntry.getValue()));
+
                     }
                 }
                 return facets;
@@ -218,4 +273,8 @@ public class JestResult {
         }
         return facets;
     }
+    
+    
+
+    
 }

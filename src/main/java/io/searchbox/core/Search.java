@@ -1,115 +1,47 @@
 package io.searchbox.core;
 
 
+import com.google.gson.Gson;
 import io.searchbox.AbstractAction;
-import io.searchbox.Action;
+import io.searchbox.AbstractMultiTypeActionBuilder;
 import io.searchbox.core.search.sort.Sort;
+import io.searchbox.params.Parameters;
 import io.searchbox.params.SearchType;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collection;
-import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class Search extends AbstractAction {
 
+    private String query;
+    private List<Sort> sortList = new LinkedList<Sort>();
 
-public class Search extends AbstractAction implements Action {
+    private Search(Builder builder) {
+        super(builder);
 
-    final static Logger log = LoggerFactory.getLogger(Search.class);
-
-    final protected LinkedHashSet<String> indexSet = new LinkedHashSet<String>();
-
-    final protected LinkedHashSet<String> typeSet = new LinkedHashSet<String>();
-
-    public Search(String query) {
-        setData(query);
+        this.query = builder.query;
+        this.sortList = builder.sortList;
+        setURI(buildURI());
     }
 
-    public Search(String query, List<Sort> sortList) {
-        String sorting = StringUtils.join(sortList, ",");
-        if (sortList.size() > 0) {
-            sorting = "\"sort\": [" + sorting + "],";
-            setData(query.replaceFirst("\\{", "\\{" + sorting));
-        } else {
-            setData(query);
-        }
+    public String getIndex() {
+        return this.indexName;
     }
 
-    protected Search() {
+    public String getType() {
+        return this.typeName;
     }
 
-    public void addIndex(String index) {
-        if (StringUtils.isNotBlank(index)) indexSet.add(index);
-    }
-
-    public void addType(String type) {
-        if (StringUtils.isNotBlank(type)) typeSet.add(type);
-    }
-
-    public boolean removeIndex(String index) {
-        return indexSet.remove(index);
-    }
-
-    public boolean removeType(String type) {
-        return typeSet.remove(type);
-    }
-
-    public void clearAllIndex() {
-        indexSet.clear();
-    }
-
-    public void clearAllType() {
-        typeSet.clear();
-    }
-
-    public void addIndex(Collection<String> index) {
-        indexSet.addAll(index);
-    }
-
-    public void addType(Collection<String> type) {
-        typeSet.addAll(type);
-    }
-
-    public boolean isIndexExist(String index) {
-        return indexSet.contains(index);
-    }
-
-    public boolean isTypeExist(String type) {
-        return typeSet.contains(type);
-    }
-
-    public int indexSize() {
-        return indexSet.size();
-    }
-
-    public int typeSize() {
-        return typeSet.size();
-    }
-
-    public String getURI() {
+    @Override
+    protected String buildURI() {
         StringBuilder sb = new StringBuilder();
-        String indexQuery = createCommaSeparatedItemList(indexSet);
-        String typeQuery = createCommaSeparatedItemList(typeSet);
-
-        if (indexQuery.length() == 0 && typeQuery.length() > 0) {
-            sb.append("_all/").append(typeQuery).append("/");
-
-        } else if (indexQuery.length() > 0 && typeQuery.length() > 0) {
-            sb.append(indexQuery).append("/").append(typeQuery).append("/");
-
-        } else if (indexQuery.length() > 0 && typeQuery.length() == 0) {
-            sb.append(indexQuery).append("/");
-        }
-        sb.append("_search");
-        String queryString = buildQueryString();
-        if (StringUtils.isNotBlank(queryString)) sb.append(queryString);
-
-        log.debug("Created URI for search action is : " + sb.toString());
+        sb.append(super.buildURI()).append("/_search");
         return sb.toString();
     }
 
@@ -123,7 +55,46 @@ public class Search extends AbstractAction implements Action {
         return "POST";
     }
 
-    public void setSearchType(SearchType searchType) {
-        this.addParameter("search_type", searchType.getValue());
+    @Override
+    public Object getData(Gson gson) {
+        String data;
+        if (sortList.size() > 0) {
+            StringBuilder sorting = new StringBuilder("\"sort\": [");
+            sorting.append(StringUtils.join(sortList, ","));
+            sorting.append("],");
+
+            data = query.replaceFirst("\\{", "\\{" + sorting.toString());
+        } else {
+            data = query;
+        }
+        return data;
+    }
+
+    public static class Builder extends AbstractMultiTypeActionBuilder<Search, Builder> {
+        private String query;
+        private List<Sort> sortList = new LinkedList<Sort>();
+
+        public Builder(String query) {
+            this.query = query;
+        }
+
+        public Builder setSearchType(SearchType searchType) {
+            return setParameter(Parameters.SEARCH_TYPE, searchType);
+        }
+
+        public Builder addSort(Sort sort) {
+            sortList.add(sort);
+            return this;
+        }
+
+        public Builder addSort(Collection<Sort> sorts) {
+            sortList.addAll(sorts);
+            return this;
+        }
+
+        @Override
+        public Search build() {
+            return new Search(this);
+        }
     }
 }

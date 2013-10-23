@@ -1,55 +1,23 @@
 package io.searchbox.core;
 
-import io.searchbox.AbstractAction;
-import io.searchbox.Action;
+import com.google.gson.Gson;
+import io.searchbox.AbstractDocumentTargetedAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
-public class Explain extends AbstractAction implements Action {
+public class Explain extends AbstractDocumentTargetedAction {
 
     final static Logger log = LoggerFactory.getLogger(Explain.class);
-
-    public static class Builder {
-        private String id;
-        private String index;
-        private String type;
-        private final Object query;
-
-        public Builder(Object query) {
-            this.query = query;
-        }
-
-        public Builder index(String val) {
-            index = val;
-            return this;
-        }
-
-        public Builder type(String val) {
-            type = val;
-            return this;
-        }
-
-        public Builder id(String val) {
-            id = val;
-            return this;
-        }
-
-        public Explain build() {
-            return new Explain(this);
-        }
-
-    }
+    private Object query;
 
     private Explain(Builder builder) {
-        indexName = builder.index;
-        typeName = builder.type;
-        id = builder.id;
-        setData(builder.query);
+        super(builder);
+        setURI(buildURI());
+        this.query = builder.query;
     }
 
     @Override
@@ -58,20 +26,29 @@ public class Explain extends AbstractAction implements Action {
     }
 
     @Override
-    public String getURI() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(super.buildURI(indexName, typeName, id))
-                .append("/_explain");
+    public Object getData(Gson gson) {
+        return query;
+    }
+
+    @Override
+    protected String buildURI() {
+        StringBuilder sb = new StringBuilder(super.buildURI());
+        sb.append("/_explain");
         log.debug("Created URI for explain action is :" + sb.toString());
         return sb.toString();
     }
 
-    protected String buildURI(String index, String type, String id) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(super.buildURI(index, type, id))
-                .append("/")
-                .append("_explain");
-        log.debug("Created URI for explain action is :" + sb.toString());
-        return sb.toString();
+    public static class Builder extends AbstractDocumentTargetedAction.Builder<Explain, Builder> {
+        private final Object query;
+
+        public Builder(Object query) {
+            this.query = query;
+        }
+
+        public Explain build() {
+            return new Explain(this);
+        }
+
     }
+
 }

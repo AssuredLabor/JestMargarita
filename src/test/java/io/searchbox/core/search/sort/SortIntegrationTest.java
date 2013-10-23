@@ -9,12 +9,9 @@ import io.searchbox.client.JestResult;
 import io.searchbox.common.AbstractIntegrationTest;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
-import io.searchbox.params.Parameters;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -42,22 +39,21 @@ public class SortIntegrationTest extends AbstractIntegrationTest {
             })
     public void searchWithValidQueryAndSort() {
         try {
-            Index index = new Index.Builder("{\"rank\":10}").index("ranker").type("ranking").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{\"rank\":10}").index("ranker").type("ranking").refresh(true).build();
             client.execute(index);
 
-            index = new Index.Builder("{\"rank\":5}").index("ranker").type("ranking").build();
-            index.addParameter(Parameters.REFRESH, true);
+            index = new Index.Builder("{\"rank\":5}").index("ranker").type("ranking").refresh(true).build();
             client.execute(index);
 
-            index = new Index.Builder("{\"rank\":8}").index("ranker").type("ranking").build();
-            index.addParameter(Parameters.REFRESH, true);
+            index = new Index.Builder("{\"rank\":8}").index("ranker").type("ranking").refresh(true).build();
             client.execute(index);
 
             Sort sort = new Sort("rank");
-            Search search = new Search(query, Arrays.asList(sort));
-            search.addIndex("ranker");
-            search.addType("ranking");
+            Search search = (Search) new Search.Builder(query)
+                    .addSort(sort)
+                    .addIndex("ranker")
+                    .addType("ranking")
+                    .build();
             JestResult result = client.execute(search);
             assertNotNull(result);
             assertTrue(result.isSucceeded());
@@ -75,10 +71,9 @@ public class SortIntegrationTest extends AbstractIntegrationTest {
     @ElasticsearchIndex(indexName = "cvbank")
     public void searchWithValidQuery() {
         try {
-            Index index = new Index.Builder("{\"user\":\"kimchy\"}").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{\"user\":\"kimchy\"}").refresh(true).build();
             client.execute(index);
-            JestResult result = client.execute(new Search(query, new ArrayList<Sort>()));
+            JestResult result = client.execute(new Search.Builder(query).build());
             assertNotNull(result);
             assertTrue(result.isSucceeded());
         } catch (Exception e) {

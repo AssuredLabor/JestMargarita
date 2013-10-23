@@ -1,7 +1,6 @@
 package io.searchbox.client;
 
 import io.searchbox.client.config.ClientConfig;
-import io.searchbox.client.config.ClientConstants;
 import io.searchbox.client.http.JestHttpClient;
 import org.apache.http.HttpHost;
 import org.apache.http.conn.routing.HttpRoute;
@@ -9,10 +8,6 @@ import org.apache.http.impl.conn.BasicClientConnectionManager;
 import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
 
 import static junit.framework.Assert.*;
 
@@ -30,9 +25,19 @@ public class JestClientFactoryTest {
         factory = new JestClientFactory();
     }
 
-
     @Test
     public void clientCreation() {
+        JestHttpClient jestClient = (JestHttpClient) factory.getObject();
+        assertTrue(jestClient != null);
+        assertNotNull(jestClient.getAsyncClient());
+        assertTrue(jestClient.getHttpClient().getConnectionManager() instanceof BasicClientConnectionManager);
+        assertEquals(jestClient.getServers().size(), 1);
+        assertTrue(jestClient.getServers().contains("http://localhost:9200"));
+    }
+
+    @Test
+    public void clientCreationWithDiscovery() {
+        factory.setClientConfig(new ClientConfig.Builder("http://localhost:9200").discoveryEnabled(true).build());
         JestHttpClient jestClient = (JestHttpClient) factory.getObject();
         assertTrue(jestClient != null);
         assertNotNull(jestClient.getAsyncClient());
@@ -52,20 +57,16 @@ public class JestClientFactoryTest {
 
     @Test
     public void multiThreadedClientCreation() {
-        ClientConfig clientConfig = new ClientConfig();
-        LinkedHashSet<String> servers = new LinkedHashSet<String>();
-        servers.add("http://localhost:9200");
-        clientConfig.getProperties().put(ClientConstants.SERVER_LIST, servers);
-        clientConfig.getProperties().put(ClientConstants.IS_MULTI_THREADED, true);
-        clientConfig.getProperties().put(ClientConstants.MAX_TOTAL_CONNECTION, 20);
-        clientConfig.getProperties().put(ClientConstants.DEFAULT_MAX_TOTAL_CONNECTION_PER_ROUTE, 10);
-
         HttpRoute routeOne = new HttpRoute(new HttpHost("http://test.localhost"));
         HttpRoute routeTwo = new HttpRoute(new HttpHost("http://localhost"));
-        Map<HttpRoute, Integer> routeConnectionLimitMap = new HashMap<HttpRoute, Integer>();
-        routeConnectionLimitMap.put(routeOne, 5);
-        routeConnectionLimitMap.put(routeTwo, 6);
-        clientConfig.getProperties().put(ClientConstants.MAX_TOTAL_CONNECTION_PER_ROUTE, routeConnectionLimitMap);
+
+        ClientConfig clientConfig = new ClientConfig.Builder("http://localhost:9200")
+                .multiThreaded(true)
+                .maxTotalConnection(20)
+                .defaultMaxTotalConnectionPerRoute(10)
+                .maxTotalConnectionPerRoute(routeOne, 5)
+                .maxTotalConnectionPerRoute(routeTwo, 6)
+                .build();
 
         factory.setClientConfig(clientConfig);
         JestHttpClient jestClient = (JestHttpClient) factory.getObject();

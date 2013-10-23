@@ -24,9 +24,8 @@ public class MultiSearchIntegrationTest extends AbstractIntegrationTest {
     @ElasticsearchIndex(indexName = "cvbank")
     public void multiSearch() {
         try {
-            MultiSearch multiSearch = new MultiSearch();
-            Search search = new Search("{\"match_all\" : {}}");
-            multiSearch.addSearch(search);
+            Search search = new Search.Builder("{\"match_all\" : {}}").build();
+            MultiSearch multiSearch = new MultiSearch.Builder(search).build();
             executeTestCase(multiSearch);
         } catch (Exception e) {
             fail("Failed during the multi search valid parameters. Exception:" + e.getMessage());
@@ -37,10 +36,8 @@ public class MultiSearchIntegrationTest extends AbstractIntegrationTest {
     @ElasticsearchIndex(indexName = "twitter")
     public void singleMultiSearchWitIndex() {
         try {
-            MultiSearch multiSearch = new MultiSearch();
-            Search search = new Search("{\"match_all\" : {}}");
-            search.addIndex("twitter");
-            multiSearch.addSearch(search);
+            Search search = new Search.Builder("{\"match_all\" : {}}").addIndex("twitter").build();
+            MultiSearch multiSearch = new MultiSearch.Builder(search).build();
             executeTestCase(multiSearch);
         } catch (Exception e) {
             fail("Failed during the multi search valid parameters. Exception:" + e.getMessage());
@@ -51,12 +48,10 @@ public class MultiSearchIntegrationTest extends AbstractIntegrationTest {
     @ElasticsearchIndex(indexName = "twitter")
     public void MultiSearchWitIndex() {
         try {
-            MultiSearch multiSearch = new MultiSearch();
-            Search search = new Search("{\"match_all\" : {}}");
-            search.addIndex("twitter");
-            multiSearch.addSearch(search);
-            Search search2 = new Search("{\"match_all\" : {}}");
-            multiSearch.addSearch(search2);
+            Search search = (Search) new Search.Builder("{\"match_all\" : {}}").addIndex("twitter").build();
+            Search search2 = new Search.Builder("{\"match_all\" : {}}").build();
+
+            MultiSearch multiSearch = new MultiSearch.Builder(search).addSearch(search2).build();
             executeTestCase(multiSearch);
         } catch (Exception e) {
             fail("Failed during the multi search valid parameters. Exception:" + e.getMessage());

@@ -7,7 +7,6 @@ import io.searchbox.client.JestResult;
 import io.searchbox.common.AbstractIntegrationTest;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
-import io.searchbox.params.Parameters;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -44,18 +43,17 @@ public class QueryFacetIntegrationTest extends AbstractIntegrationTest {
 
         try {
             for (int i = 0; i < 2; i++) {
-                Index index = new Index.Builder("{\"tag\":\"wow\", \"user\":\"root\"}").index("query_facet").type("document").build();
-                index.addParameter(Parameters.REFRESH, true);
+                Index index = new Index.Builder("{\"tag\":\"wow\", \"user\":\"root\"}").index("query_facet").type("document").refresh(true).build();
                 client.execute(index);
             }
 
-            Index index = new Index.Builder("{\"tag\":\"test\", \"user\":\"none\"}").index("query_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{\"tag\":\"test\", \"user\":\"none\"}").index("query_facet").type("document").refresh(true).build();
             client.execute(index);
 
-            Search search = new Search(query);
-            search.addIndex("query_facet");
-            search.addType("document");
+            Search search = new Search.Builder(query)
+                    .addIndex("query_facet")
+                    .addType("document")
+                    .build();
             JestResult result = client.execute(search);
             List<QueryFacet> filterFacets = result.getFacets(QueryFacet.class);
 

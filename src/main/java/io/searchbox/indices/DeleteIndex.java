@@ -1,33 +1,48 @@
 package io.searchbox.indices;
 
+import com.google.gson.JsonObject;
 import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-
-import java.util.Map;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class DeleteIndex extends AbstractAction {
 
-
-public class DeleteIndex extends AbstractAction implements Action {
-
-    public DeleteIndex(String indexName) {
-        super.indexName = indexName;
-        setURI(buildURI(indexName, null, null));
-        setRestMethodName("DELETE");
-    }
-
-    public DeleteIndex(String indexName, String type) {
-        super.indexName = indexName;
-        super.typeName = type;
-        setURI(buildURI(indexName, type, null));
-        setRestMethodName("DELETE");
+    public DeleteIndex(Builder builder) {
+        super(builder);
+        indexName = builder.index;
+        typeName = builder.type;
+        setURI(buildURI());
     }
 
     @Override
-    public Boolean isOperationSucceed(Map result) {
-        return ((Boolean) result.get("ok") && (Boolean) result.get("acknowledged"));
+    public String getRestMethodName() {
+        return "DELETE";
+    }
+
+    @Override
+    public Boolean isOperationSucceed(JsonObject result) {
+        return (result.get("ok").getAsBoolean() && result.get("acknowledged").getAsBoolean());
+    }
+
+    public static class Builder extends AbstractAction.Builder<DeleteIndex, Builder> {
+        private String index;
+        private String type;
+
+        public Builder(String index) {
+            this.index = index;
+        }
+
+        public Builder type(String type) {
+            this.type = type;
+            return this;
+        }
+
+        @Override
+        public DeleteIndex build() {
+            return new DeleteIndex(this);
+        }
     }
 
 }

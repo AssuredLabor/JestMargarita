@@ -53,22 +53,32 @@ public class DateHistogramFacetIntegrationTest extends AbstractIntegrationTest {
         try {
 
             for (int i = 0; i < 2; i++) {
-                Index index = new Index.Builder("{\"delivery\":\"2013-02-04\"}").index("date_histogram_facet").type("document").build();
-                index.addParameter(Parameters.REFRESH, true);
+                Index index = new Index.Builder("{\"delivery\":\"2013-02-04\"}")
+                        .index("date_histogram_facet")
+                        .type("document")
+                        .setParameter(Parameters.REFRESH, true)
+                        .build();
                 client.execute(index);
             }
 
-            Index index = new Index.Builder("{\"delivery\":\"2013-02-01\"}").index("date_histogram_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{\"delivery\":\"2013-02-01\"}")
+                    .index("date_histogram_facet")
+                    .type("document")
+                    .setParameter(Parameters.REFRESH, true)
+                    .build();
             client.execute(index);
 
-            index = new Index.Builder("{\"delivery\":\"2013-02-03\"}").index("date_histogram_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            index = new Index.Builder("{\"delivery\":\"2013-02-03\"}")
+                    .index("date_histogram_facet")
+                    .type("document")
+                    .setParameter(Parameters.REFRESH, true)
+                    .build();
             client.execute(index);
 
-            Search search = new Search(query);
-            search.addIndex("date_histogram_facet");
-            search.addType("document");
+            Search search = (Search) new Search.Builder(query)
+                    .addIndex("date_histogram_facet")
+                    .addType("document")
+                    .build();
             JestResult result = client.execute(search);
             List<DateHistogramFacet> dateHistogramFacets = result.getFacets(DateHistogramFacet.class);
 

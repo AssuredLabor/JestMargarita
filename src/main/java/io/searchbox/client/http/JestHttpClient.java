@@ -1,7 +1,10 @@
 package io.searchbox.client.http;
 
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import io.searchbox.Action;
 import io.searchbox.client.AbstractJestClient;
 import io.searchbox.client.JestClient;
@@ -12,10 +15,7 @@ import io.searchbox.client.http.apache.HttpGetWithEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.nio.client.HttpAsyncClient;
@@ -26,33 +26,32 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
 public class JestHttpClient extends AbstractJestClient implements JestClient {
 
     final static Logger log = LoggerFactory.getLogger(JestHttpClient.class);
-
     private HttpClient httpClient;
-
     private HttpAsyncClient asyncClient;
+    private Charset entityEncoding = Charset.forName("utf-8");
 
     public JestResult execute(Action clientRequest) throws IOException {
 
         String elasticSearchRestUrl = getRequestURL(getElasticSearchServer(), clientRequest.getURI());
 
-        HttpUriRequest request = constructHttpMethod(clientRequest.getRestMethodName(), elasticSearchRestUrl, clientRequest.getData());
+        HttpUriRequest request = constructHttpMethod(clientRequest.getRestMethodName(), elasticSearchRestUrl, clientRequest.getData(gson));
 
         // add headers added to action
         if (!clientRequest.getHeaders().isEmpty()) {
             for (Entry<String, Object> header : clientRequest.getHeaders().entrySet()) {
-                request.addHeader(header.getKey(), header.getValue() + "");
+                request.addHeader(header.getKey(), header.getValue().toString());
             }
         }
 
@@ -82,7 +81,7 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
 
         String elasticSearchRestUrl = getRequestURL(getElasticSearchServer(), clientRequest.getURI());
 
-        final HttpUriRequest request = constructHttpMethod(clientRequest.getRestMethodName(), elasticSearchRestUrl, clientRequest.getData());
+        final HttpUriRequest request = constructHttpMethod(clientRequest.getRestMethodName(), elasticSearchRestUrl, clientRequest.getData(gson));
 
         // add headers added to action
         if (!clientRequest.getHeaders().isEmpty()) {
@@ -114,51 +113,58 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
 
     }
 
-    protected HttpUriRequest constructHttpMethod(String methodName, String url, Object data) throws UnsupportedEncodingException {
-        if (methodName.equalsIgnoreCase("POST")) {
-            HttpPost httpPost = new HttpPost(url);
-            log.debug("POST method created based on client request");
-            if (data != null) httpPost.setEntity(new StringEntity(createJsonStringEntity(data), "UTF-8"));
-            return httpPost;
-        } else if (methodName.equalsIgnoreCase("PUT")) {
-            HttpPut httpPut = new HttpPut(url);
-            log.debug("PUT method created based on client request");
-            if (data != null) httpPut.setEntity(new StringEntity(createJsonStringEntity(data), "UTF-8"));
-            return httpPut;
-        } else if (methodName.equalsIgnoreCase("DELETE")) {
-            log.debug("DELETE method created based on client request");
-            HttpDeleteWithEntity httpDelete = new HttpDeleteWithEntity(url);
-            if (data != null) httpDelete.setEntity(new StringEntity(createJsonStringEntity(data), "UTF-8"));
-            return httpDelete;
-        } else if (methodName.equalsIgnoreCase("GET")) {
-            log.debug("GET method created based on client request");
-            HttpGetWithEntity httpGet = new HttpGetWithEntity(url);
-            if (data != null) httpGet.setEntity(new StringEntity(createJsonStringEntity(data), "UTF-8"));
-            return httpGet;
-        } else if (methodName.equalsIgnoreCase("HEAD")) {
-            log.debug("HEAD method created based on client request");
-            return new HttpHead(url);
-        } else {
-            return null;
+    public void shutdownClient() {
+        super.shutdownClient();
+        try {
+            asyncClient.shutdown();
+        } catch (Exception ex) {
+            log.error("Exception occurred while shutting down the asynClient. Exception: " + ex.getMessage());
         }
     }
 
-    private String createJsonStringEntity(Object data) {
-        if (data instanceof String) {
-            if (isJson(data.toString())) {
-                return data.toString();
-            } else {
-                return new Gson().toJson(data);
-            }
-        } else {
-            return new Gson().toJson(data);
+    protected HttpUriRequest constructHttpMethod(String methodName, String url, Object data) throws UnsupportedEncodingException {
+        HttpUriRequest httpUriRequest = null;
+
+        if (methodName.equalsIgnoreCase("POST")) {
+            httpUriRequest = new HttpPost(url);
+            log.debug("POST method created based on client request");
+        } else if (methodName.equalsIgnoreCase("PUT")) {
+            httpUriRequest = new HttpPut(url);
+            log.debug("PUT method created based on client request");
+        } else if (methodName.equalsIgnoreCase("DELETE")) {
+            httpUriRequest = new HttpDeleteWithEntity(url);
+            log.debug("DELETE method created based on client request");
+        } else if (methodName.equalsIgnoreCase("GET")) {
+            httpUriRequest = new HttpGetWithEntity(url);
+            log.debug("GET method created based on client request");
+        } else if (methodName.equalsIgnoreCase("HEAD")) {
+            httpUriRequest = new HttpHead(url);
+            log.debug("HEAD method created based on client request");
         }
+
+        if (httpUriRequest != null && httpUriRequest instanceof HttpEntityEnclosingRequestBase && data != null) {
+            ((HttpEntityEnclosingRequestBase) httpUriRequest).setEntity(new StringEntity(createJsonStringEntity(data), entityEncoding));
+        }
+
+        return httpUriRequest;
+    }
+
+    private String createJsonStringEntity(Object data) {
+        String entity;
+
+        if (data instanceof String && isJson(data.toString())) {
+            entity = data.toString();
+        } else {
+            entity = gson.toJson(data);
+        }
+
+        return entity;
     }
 
     private boolean isJson(String data) {
         try {
             JsonElement result = new JsonParser().parse(data);
-            return !result.equals(JsonNull.INSTANCE);
+            return !result.isJsonNull();
         } catch (JsonSyntaxException e) {
             //Check if this is a bulk request
             String[] bulkRequest = data.split("\n");
@@ -167,7 +173,10 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
     }
 
     private JestResult deserializeResponse(HttpResponse response, Action clientRequest) throws IOException {
-        return createNewElasticSearchResult(EntityUtils.toString(response.getEntity()), response.getStatusLine(), clientRequest);
+        return createNewElasticSearchResult(
+                response.getEntity() != null ? EntityUtils.toString(response.getEntity()) : null,
+                response.getStatusLine(),
+                clientRequest);
     }
 
     public HttpClient getHttpClient() {
@@ -186,4 +195,19 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
         this.asyncClient = asyncClient;
     }
 
+    public Charset getEntityEncoding() {
+        return entityEncoding;
+    }
+
+    public void setEntityEncoding(Charset entityEncoding) {
+        this.entityEncoding = entityEncoding;
+    }
+
+    public Gson getGson() {
+        return gson;
+    }
+
+    public void setGson(Gson gson) {
+        this.gson = gson;
+    }
 }

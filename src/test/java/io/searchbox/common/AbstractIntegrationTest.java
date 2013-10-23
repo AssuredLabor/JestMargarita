@@ -2,30 +2,26 @@ package io.searchbox.common;
 
 import io.searchbox.client.JestClientFactory;
 import io.searchbox.client.config.ClientConfig;
-import io.searchbox.client.config.ClientConstants;
 import io.searchbox.client.http.JestHttpClient;
 import org.junit.Before;
-
-import java.util.LinkedHashSet;
 
 /**
  * @author Dogukan Sonmez
  */
 
-public class AbstractIntegrationTest {
+public abstract class AbstractIntegrationTest {
 
     protected JestClientFactory factory;
-
     protected JestHttpClient client;
+
+    protected String getPort(){
+        return "9200";
+    }
 
     @Before
     public void setUp() throws Exception {
         factory = new JestClientFactory();
-        ClientConfig clientConfig = new ClientConfig();
-        LinkedHashSet<String> servers = new LinkedHashSet<String>();
-        servers.add("http://localhost:9200");
-        clientConfig.getProperties().put(ClientConstants.SERVER_LIST, servers);
-        clientConfig.getProperties().put(ClientConstants.IS_MULTI_THREADED, true);
+        ClientConfig clientConfig = new ClientConfig.Builder("http://localhost:" + getPort()).multiThreaded(true).build();
 
         factory.setClientConfig(clientConfig);
 

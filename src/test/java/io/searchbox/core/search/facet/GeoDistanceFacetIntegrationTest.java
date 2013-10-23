@@ -7,8 +7,7 @@ import io.searchbox.client.JestResult;
 import io.searchbox.common.AbstractIntegrationTest;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
-import io.searchbox.indices.PutMapping;
-import io.searchbox.params.Parameters;
+import io.searchbox.indices.mapping.PutMapping;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -29,8 +28,11 @@ public class GeoDistanceFacetIntegrationTest extends AbstractIntegrationTest {
     public void testQuery() {
 
         try {
-            PutMapping putMapping = new PutMapping("geo_distance_facet", "document",
-                    "{ \"document\" : { \"properties\" : { \"pin.location\" : { \"type\" : \"geo_point\" } } } }");
+            PutMapping putMapping = new PutMapping.Builder(
+                    "geo_distance_facet",
+                    "document",
+                    "{ \"document\" : { \"properties\" : { \"pin.location\" : { \"type\" : \"geo_point\" } } } }"
+            ).build();
             client.execute(putMapping);
 
             String query = "{\n" +
@@ -56,22 +58,32 @@ public class GeoDistanceFacetIntegrationTest extends AbstractIntegrationTest {
                     "            }";
 
             for (int i = 0; i < 2; i++) {
-                Index index = new Index.Builder("{\"pin\" : {\"location\" : {\"lat\" : 40.12,\"lon\" : -71.34},\"tag\" : [\"food\", \"family\"],\"text\" : \"my favorite family restaurant\"}}").index("geo_distance_facet").type("document").build();
-                index.addParameter(Parameters.REFRESH, true);
+                Index index = new Index.Builder("{\"pin\" : {\"location\" : {\"lat\" : 40.12,\"lon\" : -71.34},\"tag\" : [\"food\", \"family\"],\"text\" : \"my favorite family restaurant\"}}")
+                        .index("geo_distance_facet")
+                        .type("document")
+                        .refresh(true)
+                        .build();
                 client.execute(index);
             }
 
-            Index index = new Index.Builder("{ \"pin\" : { \"location\" : { \"lat\" : 30.12, \"lon\" : -61.34 } } }").index("geo_distance_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{ \"pin\" : { \"location\" : { \"lat\" : 30.12, \"lon\" : -61.34 } } }")
+                    .index("geo_distance_facet")
+                    .type("document")
+                    .refresh(true)
+                    .build();
             client.execute(index);
 
-            index = new Index.Builder("{ \"pin\" : { \"location\" : { \"lat\" : 10.12, \"lon\" : -31.34 } } }").index("geo_distance_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            index = new Index.Builder("{ \"pin\" : { \"location\" : { \"lat\" : 10.12, \"lon\" : -31.34 } } }")
+                    .index("geo_distance_facet")
+                    .type("document")
+                    .refresh(true)
+                    .build();
             client.execute(index);
 
-            Search search = new Search(query);
-            search.addIndex("geo_distance_facet");
-            search.addType("document");
+            Search search = (Search) new Search.Builder(query)
+                    .addIndex("geo_distance_facet")
+                    .addType("document")
+                    .build();
             JestResult result = client.execute(search);
             List<GeoDistanceFacet> distanceFacets = result.getFacets(GeoDistanceFacet.class);
 

@@ -1,109 +1,32 @@
 package io.searchbox.core;
 
+import com.google.gson.Gson;
 import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.apache.commons.lang.StringUtils;
+import io.searchbox.AbstractMultiTypeActionBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.LinkedHashSet;
-
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
-public class DeleteByQuery extends AbstractAction implements Action {
+public class DeleteByQuery extends AbstractAction {
 
     final static Logger log = LoggerFactory.getLogger(DeleteByQuery.class);
+    private String query;
 
-    final private LinkedHashSet<String> indexSet = new LinkedHashSet<String>();
+    public DeleteByQuery(Builder builder) {
+        super(builder);
 
-    final private LinkedHashSet<String> typeSet = new LinkedHashSet<String>();
-
-    public DeleteByQuery(String query) {
-        setData(query);
+        this.query = builder.query;
+        setURI(buildURI());
     }
 
-    protected DeleteByQuery() {
-    }
-
-    public void addIndex(String index) {
-        if (StringUtils.isNotBlank(index)) {
-            indexSet.add(index);
-        }
-    }
-
-    public void addType(String type) {
-        if (StringUtils.isNotBlank(type)) typeSet.add(type);
-    }
-
-    public boolean removeIndex(String index) {
-        return indexSet.remove(index);
-    }
-
-    public boolean removeType(String type) {
-        return typeSet.remove(type);
-    }
-
-    public void clearAllIndex() {
-        indexSet.clear();
-    }
-
-    public void clearAllType() {
-        typeSet.clear();
-    }
-
-    public void addIndex(Collection<String> index) {
-        indexSet.addAll(index);
-    }
-
-    public void addType(Collection<String> type) {
-        typeSet.addAll(type);
-    }
-
-    public boolean isIndexExist(String index) {
-        return indexSet.contains(index);
-    }
-
-    public boolean isTypeExist(String type) {
-        return typeSet.contains(type);
-    }
-
-    public int indexSize() {
-        return indexSet.size();
-    }
-
-    public int typeSize() {
-        return typeSet.size();
-    }
-
-    public String getURI() {
+    @Override
+    public String buildURI() {
         StringBuilder sb = new StringBuilder();
-        String indexQuery = createQueryString(indexSet);
-        String typeQuery = createQueryString(typeSet);
-        if (indexQuery.length() == 0) {
-            sb.append("_all/");
-        } else {
-            sb.append(indexQuery).append("/");
-            if (typeQuery.length() > 0) {
-                sb.append(typeQuery).append("/");
-            }
-        }
-        sb.append("_query");
+        sb.append(super.buildURI()).append("/_query");
         log.debug("Created URI for delete by query action is : {}", sb.toString());
-        return sb.toString();
-    }
-
-    protected String createQueryString(LinkedHashSet<String> set) {
-        StringBuilder sb = new StringBuilder();
-        String tmp = "";
-        for (String index : set) {
-            sb.append(tmp);
-            sb.append(index);
-            tmp = ",";
-        }
         return sb.toString();
     }
 
@@ -116,4 +39,24 @@ public class DeleteByQuery extends AbstractAction implements Action {
     public String getRestMethodName() {
         return "DELETE";
     }
+
+    @Override
+    public Object getData(Gson gson) {
+        return query;
+    }
+
+    public static class Builder extends AbstractMultiTypeActionBuilder<DeleteByQuery, Builder> {
+
+        private String query;
+
+        public Builder(String query) {
+            this.query = query;
+        }
+
+        @Override
+        public DeleteByQuery build() {
+            return new DeleteByQuery(this);
+        }
+    }
+
 }

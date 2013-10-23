@@ -1,31 +1,58 @@
 package io.searchbox.core;
 
+import com.google.gson.Gson;
 import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
+ * Use this action to query on registered percolaters.
+ *
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class Percolate extends AbstractAction {
 
+    private Object query;
 
-public class Percolate extends AbstractAction implements Action {
+    public Percolate(Builder builder) {
+        super(builder);
 
-    final static Logger log = LoggerFactory.getLogger(Percolate.class);
-
-    public Percolate(String indexName, String type, Object query) {
-        setURI(buildGetURI(indexName, type));
-        setData(query);
-        setRestMethodName("POST");
+        this.indexName = builder.index;
+        this.typeName = builder.type;
+        this.query = builder.query;
+        setURI(buildURI());
     }
 
-    private String buildGetURI(String indexName, String type) {
+    @Override
+    public String getRestMethodName() {
+        return "POST";
+    }
+
+    @Override
+    public Object getData(Gson gson) {
+        return query;
+    }
+
+    @Override
+    protected String buildURI() {
         StringBuilder sb = new StringBuilder();
-        sb.append(super.buildURI(indexName, type, null))
-                .append("/")
-                .append("_percolate");
-        log.debug("Created URI for update action is :" + sb.toString());
+        sb.append(super.buildURI()).append("/_percolate");
         return sb.toString();
+    }
+
+    public static class Builder extends AbstractAction.Builder<Percolate, Builder> {
+        private String index;
+        private String type;
+        private Object query;
+
+        public Builder(String index, String type, Object query) {
+            this.index = index;
+            this.type = type;
+            this.query = query;
+        }
+
+        @Override
+        public Percolate build() {
+            return new Percolate(this);
+        }
     }
 }

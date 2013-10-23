@@ -1,5 +1,6 @@
 package io.searchbox.client;
 
+import com.google.gson.JsonObject;
 import io.searchbox.client.http.JestHttpClient;
 import io.searchbox.core.Delete;
 import io.searchbox.core.Get;
@@ -11,7 +12,6 @@ import org.junit.Test;
 
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 
 import static junit.framework.Assert.*;
@@ -32,25 +32,25 @@ public class AbstractJestClientTest {
                 "    \"_type\" : \"tweet\",\n" +
                 "    \"_id\" : \"1\"\n" +
                 "}";
-        Map jsonMap = client.convertJsonStringToMapObject(json);
+        JsonObject jsonMap = client.convertJsonStringToMapObject(json);
         assertNotNull(jsonMap);
-        assertEquals(4, jsonMap.size());
-        assertEquals(true, jsonMap.get("ok"));
-        assertEquals("twitter", jsonMap.get("_index"));
-        assertEquals("tweet", jsonMap.get("_type"));
-        assertEquals("1", jsonMap.get("_id"));
+        assertEquals(4, jsonMap.entrySet().size());
+        assertEquals(true, jsonMap.get("ok").getAsBoolean());
+        assertEquals("twitter", jsonMap.get("_index").getAsString());
+        assertEquals("tweet", jsonMap.get("_type").getAsString());
+        assertEquals("1", jsonMap.get("_id").getAsString());
     }
 
     @Test
     public void convertEmptyJsonStringToMapObject() {
-        Map jsonMap = client.convertJsonStringToMapObject("");
-        assertNull(jsonMap);
+        JsonObject jsonMap = client.convertJsonStringToMapObject("");
+        assertNotNull(jsonMap);
     }
 
     @Test
     public void convertNullJsonStringToMapObject() {
-        Map jsonMap = client.convertJsonStringToMapObject(null);
-        assertNull(jsonMap);
+        JsonObject jsonMap = client.convertJsonStringToMapObject(null);
+        assertNotNull(jsonMap);
     }
 
 
@@ -90,7 +90,7 @@ public class AbstractJestClientTest {
                 "    \"found\" : true\n" +
                 "}\n";
         StatusLine statusLine = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "");
-        Delete delete = new Delete.Builder("1").index("test").build();
+        Delete delete = new Delete.Builder("twitter", "tweet", "1").build();
         JestResult result = client.createNewElasticSearchResult(jsonString, statusLine, delete);
         assertNotNull(result);
         assertTrue(result.isSucceeded());
@@ -106,7 +106,7 @@ public class AbstractJestClientTest {
                 "    \"found\" : false\n" +
                 "}\n";
         StatusLine statusLine = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "");
-        Delete delete = new Delete.Builder("1").index("test").build();
+        Delete delete = new Delete.Builder("test", "tweet", "1").build();
         JestResult result = client.createNewElasticSearchResult(jsonString, statusLine, delete);
         assertNotNull(result);
         assertFalse(result.isSucceeded());
@@ -121,7 +121,7 @@ public class AbstractJestClientTest {
                 "    \"exists\" : true" +
                 "}";
         StatusLine statusLine = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "");
-        Get get = new Get.Builder("1").index("test").build();
+        Get get = new Get.Builder("test", "1").build();
         JestResult result = client.createNewElasticSearchResult(jsonString, statusLine, get);
         assertNotNull(result);
         assertTrue(result.isSucceeded());

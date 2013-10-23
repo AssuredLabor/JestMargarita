@@ -1,130 +1,67 @@
 package io.searchbox;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multiset;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.searchbox.annotations.JestId;
 import io.searchbox.core.Doc;
-import org.apache.commons.lang.StringUtils;
+import io.searchbox.params.Parameters;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
-import java.util.LinkedHashSet;
+import java.net.URLEncoder;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
 public abstract class AbstractAction implements Action {
 
     final static Logger log = LoggerFactory.getLogger(AbstractAction.class);
-
-    private Object data;
-
-    private String URI;
-
-    private String restMethodName;
-
-    private boolean isBulkOperation = false;
-
-    public String getIndexName() {
-        return indexName;
-    }
-
-    public String getTypeName() {
-        return typeName;
-    }
-
-    public String getId() {
-        return id;
-    }
-
+    public static String CHARSET = "utf-8";
+    private final ConcurrentMap<String, Object> headerMap = new ConcurrentHashMap<String, Object>();
+    private final Multimap<String, Object> parameterMap = HashMultimap.create();
     protected String indexName;
-
     protected String typeName;
-
-    protected String id;
-
+    protected String nodes;
+    private String URI;
+    private boolean isBulkOperation;
     private String pathToResult;
 
-    private final ConcurrentMap<String, Object> parameterMap = new ConcurrentHashMap<String, Object>();
-
-    private final ConcurrentMap<String, Object> headerMap = new ConcurrentHashMap<String, Object>();
-
-    public void setRestMethodName(String restMethodName) {
-        this.restMethodName = restMethodName;
+    public AbstractAction() {
     }
 
-    public void addParameter(String parameter, Object value) {
-        parameterMap.put(parameter, value);
-    }
+    @SuppressWarnings("unchecked")
+    public AbstractAction(Builder builder) {
+        parameterMap.putAll(builder.parameters);
+        headerMap.putAll(builder.headers);
 
-    public void removeParameter(String parameter) {
-        parameterMap.remove(parameter);
-    }
-
-    public boolean isParameterExist(String parameter) {
-        return parameterMap.containsKey(parameter);
-    }
-
-    public Object getParameter(String parameter) {
-        return parameterMap.get(parameter);
-    }
-
-    public void addHeader(String header, Object value) {
-        headerMap.put(header, value);
-    }
-
-    public void removeHeader(String header) {
-        headerMap.remove(header);
-    }
-
-    public boolean isHeaderExist(String header) {
-        return headerMap.containsKey(header);
-    }
-
-    public Object getHeader(String header) {
-        return headerMap.get(header);
-    }
-
-    public Map<String, Object> getHeaders() {
-        return headerMap;
-    }
-
-    public void setURI(String URI) {
-        this.URI = URI;
-    }
-
-    public void setData(Object data) {
-        this.data = data;
-    }
-
-    public String getURI() {
-        if (parameterMap.size() > 0) {
-            URI = URI + buildQueryString();
+        if (builder instanceof AbstractMultiIndexActionBuilder) {
+            indexName = ((AbstractMultiIndexActionBuilder) builder).getJoinedIndices();
+            if (builder instanceof AbstractMultiTypeActionBuilder) {
+                indexName = ((AbstractMultiTypeActionBuilder) builder).getJoinedIndices();
+                typeName = ((AbstractMultiTypeActionBuilder) builder).getJoinedTypes();
+            }
+        } else if (builder instanceof AbstractMultiINodeActionBuilder) {
+            nodes = ((AbstractMultiINodeActionBuilder) builder).getJoinedNodes();
         }
-        return URI;
     }
 
-    public String getRestMethodName() {
-        return restMethodName;
-    }
-
-    public Object getData() {
-        return data;
-    }
-
-    public String getName() {
-        return null;
-    }
-
-    public String getPathToResult() {
-        return pathToResult;
-    }
-
-    public String getIdFromSource(Object source) {
+    public static String getIdFromSource(Object source) {
         if (source == null) return null;
         Field[] fields = source.getClass().getDeclaredFields();
         for (Field field : fields) {
@@ -141,51 +78,92 @@ public abstract class AbstractAction implements Action {
         return null;
     }
 
-    public String createCommaSeparatedItemList(LinkedHashSet<String> set) {
-        StringBuilder sb = new StringBuilder();
-        String tmp = "";
-        for (String index : set) {
-            sb.append(tmp);
-            sb.append(index);
-            tmp = ",";
-        }
-        return sb.toString();
+    public Collection<Object> getParameter(String parameter) {
+        return parameterMap.get(parameter);
     }
 
-    protected String buildURI(Doc doc) {
-        return buildURI(doc.getIndex(), doc.getType(), doc.getId());
+    public Object getHeader(String header) {
+        return headerMap.get(header);
     }
 
-    protected String buildURI(String index, String type, String id) {
-        StringBuilder sb = new StringBuilder();
-
-        if (StringUtils.isNotBlank(index)) {
-            sb.append(index);
-        }
-
-        if (StringUtils.isNotBlank(type)) {
-            sb.append("/").append(type);
-        }
-
-        if (StringUtils.isNotBlank(id)) sb.append("/").append(id);
-
-        log.debug("Created uri: " + sb.toString());
-
-        return sb.toString();
+    @Override
+    public Map<String, Object> getHeaders() {
+        return headerMap;
     }
 
-    protected String buildQueryString() {
-        StringBuilder queryString = new StringBuilder("");
-        for (Map.Entry<?, ?> entry : parameterMap.entrySet()) {
-            if (queryString.length() == 0) {
-                queryString.append("?");
-            } else {
-                queryString.append("&");
+    @Override
+    public String getURI() {
+        String finalUri = URI;
+        if (parameterMap.size() > 0) {
+            try {
+                finalUri += buildQueryString();
+            } catch (UnsupportedEncodingException e) {
+                // unless CHARSET is overridden with a wrong value in a subclass,
+                // this exception won't be thrown.
+                log.error("Error occurred while adding parameters to uri.", e);
             }
-            queryString.append(entry.getKey().toString())
-                    .append("=")
-                    .append(entry.getValue().toString());
         }
+        return finalUri;
+    }
+
+    protected void setURI(String URI) {
+        this.URI = URI;
+    }
+
+    @Override
+    public Object getData(Gson gson) {
+        return null;
+    }
+
+    @Override
+    public String getPathToResult() {
+        return pathToResult;
+    }
+
+    protected void setPathToResult(String pathToResult) {
+        this.pathToResult = pathToResult;
+    }
+
+    protected String buildURI() {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            if (StringUtils.isNotBlank(indexName)) {
+                sb.append(URLEncoder.encode(indexName, CHARSET));
+
+                if (StringUtils.isNotBlank(typeName)) {
+                    sb.append("/").append(URLEncoder.encode(typeName, CHARSET));
+                }
+        }
+        } catch (UnsupportedEncodingException e) {
+            // unless CHARSET is overridden with a wrong value in a subclass,
+            // this exception won't be thrown.
+            log.error("Error occurred while adding index/type to uri", e);
+        }
+
+        String uri = sb.toString();
+        return uri;
+    }
+
+    protected String buildQueryString() throws UnsupportedEncodingException {
+        StringBuilder queryString = new StringBuilder();
+        Multiset<String> paramKeys = parameterMap.keys();
+
+        queryString.append("?");
+        for (String key : paramKeys) {
+            Collection<Object> values = parameterMap.get(key);
+            for (Object value : values) {
+                queryString.append(URLEncoder.encode(key, CHARSET))
+                        .append("=")
+                        .append(URLEncoder.encode(value.toString(), CHARSET))
+                        .append("&");
+            }
+        }
+
+        // if there are any params  ->  deletes the final ampersand
+        // if no params             ->  deletes the question mark
+        queryString.deleteCharAt(queryString.length() - 1);
+
         return queryString.toString();
     }
 
@@ -201,16 +179,101 @@ public abstract class AbstractAction implements Action {
         return isBulkOperation;
     }
 
-    public void setBulkOperation(boolean bulkOperation) {
+    protected void setBulkOperation(boolean bulkOperation) {
         isBulkOperation = bulkOperation;
     }
 
-    public void setPathToResult(String pathToResult) {
-        this.pathToResult = pathToResult;
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .appendSuper(super.toString())
+                .append("uri", getURI())
+                .append("method", getRestMethodName())
+                .toString();
     }
 
     @Override
-    public Boolean isOperationSucceed(Map result) {
+    public int hashCode() {
+        return new HashCodeBuilder()
+                .append(getURI())
+                .append(getRestMethodName())
+                .append(getHeaders())
+                .toHashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) { return false; }
+        if (obj == this) { return true; }
+        if (obj.getClass() != getClass()) {
+            return false;
+        }
+
+        AbstractAction rhs = (AbstractAction) obj;
+        return new EqualsBuilder()
+                .append(getURI(), rhs.getURI())
+                .append(getRestMethodName(), rhs.getRestMethodName())
+                .append(getHeaders(), rhs.getHeaders())
+                .isEquals();
+    }
+
+    @Deprecated
+    @Override
+    public final Boolean isOperationSucceed(@SuppressWarnings("rawtypes") Map result) {
+        return isOperationSucceed(new JsonParser().parse(new Gson().toJson(result, Map.class)).getAsJsonObject());
+    }
+
+    @Override
+    public Boolean isOperationSucceed(JsonObject result) {
         return true;
+    }
+
+    public abstract String getRestMethodName();
+
+    @SuppressWarnings("unchecked")
+    protected static abstract class Builder<T extends Action, K> {
+        protected Multimap<String, Object> parameters = HashMultimap.<String, Object>create();
+        protected Map<String, Object> headers = new HashMap<String, Object>();
+
+        public K setParameter(String key, Object value) {
+            parameters.put(key, value);
+            return (K) this;
+        }
+
+        @Deprecated
+        public K setParameter(Map<String, Object> parameters) {
+            for (Map.Entry<String, Object> entry : parameters.entrySet()) {
+                this.parameters.put(entry.getKey(), entry.getValue());
+            }
+            return (K) this;
+        }
+
+        public K setHeader(String key, Object value) {
+            headers.put(key, value);
+            return (K) this;
+        }
+
+        public K setHeader(Map<String, Object> headers) {
+            this.headers.putAll(headers);
+            return (K) this;
+        }
+
+        public K refresh(boolean refresh) {
+            return setParameter(Parameters.REFRESH, refresh);
+        }
+
+        /**
+         * All REST APIs accept the case parameter.
+         * When set to camelCase, all field names in the result will be returned
+         * in camel casing, otherwise, underscore casing will be used. Note,
+         * this does not apply to the source document indexed.
+         *
+         */
+        public K resultCasing(String caseParam) {
+            setParameter(Parameters.RESULT_CASING, caseParam);
+            return (K) this;
+        }
+
+        abstract public T build();
     }
 }

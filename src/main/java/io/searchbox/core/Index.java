@@ -1,82 +1,26 @@
 package io.searchbox.core;
 
-import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import io.searchbox.AbstractDocumentTargetedAction;
+import io.searchbox.BulkableAction;
+import io.searchbox.params.Parameters;
 
-import java.util.Map;
+import java.util.Collection;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
+public class Index extends AbstractDocumentTargetedAction implements BulkableAction {
 
-
-public class Index extends AbstractAction implements Action {
-
-    final static Logger log = LoggerFactory.getLogger(Index.class);
-
-    public static class Builder {
-        private String index = null;
-        private String type = null;
-        private String id = null;
-        private final Object source;
-
-        public Builder(Object source) {
-            this.source = source;
-        }
-
-        public Builder index(String val) {
-            index = val;
-            return this;
-        }
-
-        public Builder type(String val) {
-            type = val;
-            return this;
-        }
-
-        public Builder id(String val) {
-            id = val;
-            return this;
-        }
-
-        public Index build() {
-            return new Index(this);
-        }
-    }
+    private Object source;
 
     private Index(Builder builder) {
-        setData(builder.source);
-        String id = StringUtils.isNotBlank(builder.id) ? builder.id : this.getIdFromSource(builder.source);
-        prepareIndex(builder.index, builder.type, id);
-    }
+        super(builder);
 
-    private void prepareIndex(String indexName, String typeName, String id) {
-        super.indexName = indexName;
-        super.typeName = typeName;
-        if (id != null) {
-            setRestMethodName("PUT");
-        } else {
-            setRestMethodName("POST");
-        }
-        super.id = id;
-    }
-
-    /* Need to call buildURI method each time to check if new parameter added*/
-    @Override
-    public String getURI() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(buildURI(indexName, typeName, id));
-        String queryString = buildQueryString();
-        if (StringUtils.isNotBlank(queryString)) sb.append(queryString);
-        return sb.toString();
-    }
-
-    @Override
-    public String getName() {
-        return "INDEX";
+        this.source = builder.source;
+        setURI(buildURI());
     }
 
     @Override
@@ -85,7 +29,43 @@ public class Index extends AbstractAction implements Action {
     }
 
     @Override
-    public Boolean isOperationSucceed(Map result) {
-        return (Boolean) result.get("ok");
+    public Boolean isOperationSucceed(JsonObject result) {
+        return result.get("ok").getAsBoolean();
+    }
+
+    @Override
+    public String getRestMethodName() {
+        return (id != null) ? "PUT" : "POST";
+    }
+
+    @Override
+    public Object getData(Gson gson) {
+        return source;
+    }
+
+    @Override
+    public String getBulkMethodName() {
+        Collection<Object> opType = getParameter(Parameters.OP_TYPE);
+        if (opType != null) {
+            if (opType.size() > 1) {
+                throw new IllegalArgumentException("Expecting a single value for OP_TYPE parameter, you provided: " + opType.size());
+            }
+            return (opType.size() == 1 && ((opType.iterator().next()).toString().equalsIgnoreCase("create"))) ? "create" : "index";
+        } else {
+            return "index";
+        }
+    }
+
+    public static class Builder extends AbstractDocumentTargetedAction.Builder<Index, Builder> {
+        private final Object source;
+
+        public Builder(Object source) {
+            this.source = source;
+            this.id(getIdFromSource(source)); // set the default for id if it exists in source
+        }
+
+        public Index build() {
+            return new Index(this);
+        }
     }
 }

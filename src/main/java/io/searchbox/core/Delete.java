@@ -1,67 +1,18 @@
 package io.searchbox.core;
 
-import io.searchbox.AbstractAction;
-import io.searchbox.Action;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Map;
+import com.google.gson.JsonObject;
+import io.searchbox.AbstractDocumentTargetedAction;
+import io.searchbox.BulkableAction;
 
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
-public class Delete extends AbstractAction implements Action {
-
-    final static Logger log = LoggerFactory.getLogger(Delete.class);
-
-    public static class Builder {
-        private String index;
-        private String type;
-        private String id;
-
-        public Builder() {
-        }
-
-        public Builder(String id) {
-            this.id = id;
-        }
-
-        public Builder index(String val) {
-            index = val;
-            return this;
-        }
-
-        public Builder type(String val) {
-            type = val;
-            return this;
-        }
-
-        public Delete build() {
-            return new Delete(this);
-        }
-    }
+public class Delete extends AbstractDocumentTargetedAction implements BulkableAction {
 
     private Delete(Builder builder) {
-        indexName = builder.index;
-        typeName = builder.type;
-        id = builder.id;
-    }
-
-    @Override
-    public String getURI() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(buildURI(indexName, typeName, id));
-        String queryString = buildQueryString();
-        if (StringUtils.isNotBlank(queryString)) sb.append(queryString);
-        return sb.toString();
-    }
-
-    @Override
-    public String getName() {
-        return "DELETE";
+        super(builder);
+        setURI(buildURI());
     }
 
     @Override
@@ -75,7 +26,31 @@ public class Delete extends AbstractAction implements Action {
     }
 
     @Override
-    public Boolean isOperationSucceed(Map result) {
-        return ((Boolean) result.get("ok") && (Boolean) result.get("found"));
+    public Boolean isOperationSucceed(JsonObject result) {
+        return (result.get("ok").getAsBoolean() && result.get("found").getAsBoolean());
+    }
+
+    @Override
+    public String getBulkMethodName() {
+        return "delete";
+    }
+
+    public static class Builder extends AbstractDocumentTargetedAction.Builder<Delete, Builder> {
+
+        /**
+         * Index, type & id parameters are mandatory since purpose of this action is to delete a
+         * single document. You may use DeleteMapping action to delete a mapping or DeleteIndex
+         * action to delete an index.
+         */
+        public Builder(String index, String type, String id) {
+            this.index(index);
+            this.type(type);
+            this.id(id);
+        }
+
+        public Delete build() {
+            return new Delete(this);
+        }
+
     }
 }

@@ -9,7 +9,6 @@ import io.searchbox.client.JestResult;
 import io.searchbox.common.AbstractIntegrationTest;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
-import io.searchbox.params.Parameters;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -82,22 +81,20 @@ public class RangeFacetIntegrationTest extends AbstractIntegrationTest {
 
         try {
             for (int i = 0; i < 2; i++) {
-                Index index = new Index.Builder("{\"width\":\"80\"}").index("range_facet").type("document").build();
-                index.addParameter(Parameters.REFRESH, true);
+                Index index = new Index.Builder("{\"width\":\"80\"}").index("range_facet").type("document").refresh(true).build();
                 client.execute(index);
             }
 
-            Index index = new Index.Builder("{\"width\":\"70\"}").index("range_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            Index index = new Index.Builder("{\"width\":\"70\"}").index("range_facet").type("document").refresh(true).build();
             client.execute(index);
 
-            index = new Index.Builder("{\"width\":\"30\"}").index("range_facet").type("document").build();
-            index.addParameter(Parameters.REFRESH, true);
+            index = new Index.Builder("{\"width\":\"30\"}").index("range_facet").type("document").refresh(true).build();
             client.execute(index);
 
-            Search search = new Search(query);
-            search.addIndex("range_facet");
-            search.addType("document");
+            Search search = (Search) new Search.Builder(query)
+                    .addIndex("range_facet")
+                    .addType("document")
+                    .build();
             JestResult result = client.execute(search);
             List<RangeFacet> rangeFacetList = result.getFacets(RangeFacet.class);
 

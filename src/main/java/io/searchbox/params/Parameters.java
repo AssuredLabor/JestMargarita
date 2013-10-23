@@ -1,14 +1,25 @@
 package io.searchbox.params;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * @author Dogukan Sonmez
+ * @author cihat keser
  */
-
-
 public class Parameters {
 
     private Parameters() {
     }
+
+    // All REST APIs accept a callback parameter resulting in a JSONP result.
+    public static final String CALLBACK = "callback";
+
+    // 'camelCase'
+    public static final String RESULT_CASING = "case";
+
+    // 'none' | 'missing'
+    public static final String IGNORE_INDICES = "ignore_indices";
 
     //'quorum' | 'one' | 'all'
     public static final String CONSISTENCY = "consistency";
@@ -52,4 +63,24 @@ public class Parameters {
     // result size
     public static final String SIZE = "size";
 
+    public static final String SCROLL = "scroll";
+
+    public static final String SCROLL_ID = "scroll_id";
+
+    public static final String SEARCH_TYPE = "search_type";
+
+    public static final String PERCOLATOR = "percolate";
+
+    public static final String RETRY_ON_CONFLICT = "retry_on_conflict";
+
+    public static final List<String> ACCEPTED_IN_BULK = Arrays.asList(
+            ROUTING,
+            PERCOLATOR,
+            PARENT,
+            TIMESTAMP,
+            TTL,
+            RETRY_ON_CONFLICT,
+            VERSION,
+            VERSION_TYPE
+    );
 }
