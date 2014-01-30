@@ -5,7 +5,7 @@
 	<groupId>io.searchbox</groupId>
 	<artifactId>jest</artifactId>
 	<packaging>jar</packaging>
-	<version>0.0.6.AL1-SNAPSHOT</version>
+	<version>0.0.6.AL2-SNAPSHOT</version>
 	<description>ElasticSearch Java rest client</description>
 	<url>https://github.com/searchbox-io/Jest</url>
 
@@ -69,9 +69,9 @@
 		<gson.version>2.2.3</gson.version>
 		<elasticsearch.version>0.90.5</elasticsearch.version>
 		<log4j.version>1.2.16</log4j.version>
-		<httpComponent.version>4.2.3</httpComponent.version>
-		<httpClient.version>4.2.3</httpClient.version>
-		<httpAsyncClient.version>4.0-beta3</httpAsyncClient.version>
+        <httpComponent.version>4.3.1</httpComponent.version>
+        <httpClient.version>4.3.2</httpClient.version>
+        <httpAsyncClient.version>4.0</httpAsyncClient.version>
 		<commonsLang.version>3.1</commonsLang.version>
 		<slf4j.version>1.7.5</slf4j.version>
 		<elasticsearch-test.version>0.90.5</elasticsearch-test.version>

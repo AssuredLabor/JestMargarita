@@ -1,10 +1,11 @@
 package io.searchbox.client.config;
 
-import com.google.gson.Gson;
-import org.apache.http.conn.routing.HttpRoute;
-
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.http.conn.routing.HttpRoute;
+
+import com.google.gson.Gson;
 
 /**
  * @author Dogukan Sonmez
@@ -12,6 +13,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class ClientConfig {
 
+    private final static int DEFAULT_TIMEOUT = 3000;
+    
     private Set<String> serverList;
     private boolean isMultiThreaded;
     private Integer maxTotalConnection;
@@ -21,6 +24,8 @@ public class ClientConfig {
     private long discoveryFrequency;
     private TimeUnit discoveryFrequencyTimeUnit;
     private Gson gson;
+    private int connTimeout;
+    private int readTimeout;
 
     private ClientConfig() {
     }
@@ -34,7 +39,17 @@ public class ClientConfig {
         this.isDiscoveryEnabled = builder.isDiscoveryEnabled;
         this.discoveryFrequency = builder.discoveryFrequency;
         this.discoveryFrequencyTimeUnit = builder.discoveryFrequencyTimeUnit;
+        this.connTimeout = builder.connTimeout;
+        this.readTimeout = builder.readTimeout;
         this.gson = builder.gson;
+    }
+    
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+
+    public int getConnTimeout() {
+        return connTimeout;
     }
 
     public Set<String> getServerList() {
@@ -78,6 +93,8 @@ public class ClientConfig {
         private boolean isMultiThreaded;
         private Integer maxTotalConnection;
         private Integer defaultMaxTotalConnectionPerRoute;
+        protected Integer connTimeout = DEFAULT_TIMEOUT;
+        protected Integer readTimeout = DEFAULT_TIMEOUT;
         private Map<HttpRoute, Integer> maxTotalConnectionPerRoute = new HashMap<HttpRoute, Integer>();
         private boolean isDiscoveryEnabled;
         private long discoveryFrequency = 10L;
@@ -92,6 +109,8 @@ public class ClientConfig {
             this.maxTotalConnectionPerRoute = clientConfig.maxTotalConnectionPerRoute;
             this.isDiscoveryEnabled = clientConfig.isDiscoveryEnabled;
             this.discoveryFrequency = clientConfig.discoveryFrequency;
+            this.connTimeout = clientConfig.connTimeout;
+            this.readTimeout = clientConfig.readTimeout;
             this.discoveryFrequencyTimeUnit = clientConfig.discoveryFrequencyTimeUnit;
             this.gson = clientConfig.gson;
         }
@@ -135,6 +154,16 @@ public class ClientConfig {
             return this;
         }
 
+        public Builder connTimeout(int connTimeout) {
+            this.connTimeout = connTimeout;
+            return this;
+        }
+        
+        public Builder readTimeout(int readTimeout) {
+            this.readTimeout = readTimeout;
+            return this;
+        }
+        
         public Builder maxTotalConnection(int maxTotalConnection) {
             this.maxTotalConnection = maxTotalConnection;
             return this;

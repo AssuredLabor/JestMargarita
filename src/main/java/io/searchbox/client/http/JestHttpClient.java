@@ -1,34 +1,32 @@
 package io.searchbox.client.http;
 
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import io.searchbox.Action;
-import io.searchbox.client.AbstractJestClient;
-import io.searchbox.client.JestClient;
-import io.searchbox.client.JestResult;
-import io.searchbox.client.JestResultHandler;
+import io.searchbox.client.*;
 import io.searchbox.client.http.apache.HttpDeleteWithEntity;
 import io.searchbox.client.http.apache.HttpGetWithEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.*;
-import org.apache.http.concurrent.FutureCallback;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.nio.client.HttpAsyncClient;
-import org.apache.http.nio.reactor.IOReactorStatus;
-import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.*;
+import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
+import org.apache.http.nio.client.HttpAsyncClient;
+import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.gson.*;
 
 
 /**
@@ -38,8 +36,11 @@ import java.util.concurrent.ExecutionException;
 public class JestHttpClient extends AbstractJestClient implements JestClient {
 
     final static Logger log = LoggerFactory.getLogger(JestHttpClient.class);
-    private HttpClient httpClient;
-    private HttpAsyncClient asyncClient;
+    
+    private HttpClientConnectionManager connectionManager;
+    private RequestConfig defaultRequestConfig;
+    private CloseableHttpClient httpClient;
+    private CloseableHttpAsyncClient asyncClient;
     private Charset entityEncoding = Charset.forName("utf-8");
 
     public JestResult execute(Action clientRequest) throws IOException {
@@ -74,7 +75,7 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
             throws ExecutionException, InterruptedException, IOException {
 
         synchronized (this) {
-            if (asyncClient.getStatus() == IOReactorStatus.INACTIVE) {
+            if (!asyncClient.isRunning()) {
                 asyncClient.start();
             }
         }
@@ -116,7 +117,8 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
     public void shutdownClient() {
         super.shutdownClient();
         try {
-            asyncClient.shutdown();
+            asyncClient.close();
+            httpClient.close();
         } catch (Exception ex) {
             log.error("Exception occurred while shutting down the asynClient. Exception: " + ex.getMessage());
         }
@@ -179,11 +181,28 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
                 clientRequest);
     }
 
-    public HttpClient getHttpClient() {
+    public HttpClientConnectionManager getConnectionManager() {
+        return connectionManager;
+    }
+
+    public void setConnectionManager(HttpClientConnectionManager connManager) {
+        connectionManager = connManager;
+    }
+
+
+    public RequestConfig getDefaultRequestConfig() {
+        return defaultRequestConfig;
+    }
+
+    public void setDefaultRequestConfig(RequestConfig requestConfig) {
+        defaultRequestConfig = requestConfig;
+    }
+
+    public CloseableHttpClient getHttpClient() {
         return httpClient;
     }
 
-    public void setHttpClient(HttpClient httpClient) {
+    public void setHttpClient(CloseableHttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
@@ -191,7 +210,7 @@ public class JestHttpClient extends AbstractJestClient implements JestClient {
         return asyncClient;
     }
 
-    public void setAsyncClient(HttpAsyncClient asyncClient) {
+    public void setAsyncClient(CloseableHttpAsyncClient asyncClient) {
         this.asyncClient = asyncClient;
     }
 
